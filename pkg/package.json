@@ -1,0 +1,16 @@
+{
+  "name": "rust-sudoku-solver",
+  "collaborators": [
+    "Russell DuBrock <russell.dubrock@gmail.com>"
+  ],
+  "description": null,
+  "version": "0.1.0",
+  "license": null,
+  "repository": null,
+  "files": [
+    "rust_sudoku_solver_bg.wasm",
+    "rust_sudoku_solver.d.ts"
+  ],
+  "main": "rust_sudoku_solver.js",
+  "types": "rust_sudoku_solver.d.ts"
+}

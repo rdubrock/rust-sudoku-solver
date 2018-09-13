@@ -1,0 +1,10 @@
+Sep 09 13:37:21.312 ERRO Ensure that you have "[1m[2mwasm-bindgen[0m" as a dependency in your Cargo.toml file:
+[dependencies]
+wasm-bindgen = "0.2"
+Sep 09 13:37:54.100 ERRO Compilation of your program failed. stderr:
+
+error: failed to parse manifest at `/Users/russelldubrock/rust/rust-sudoku-solver/Cargo.toml`
+
+Caused by:
+  can't find library `rust-sudoku-solver`, rename file to `src/lib.rs` or specify lib.path
+
