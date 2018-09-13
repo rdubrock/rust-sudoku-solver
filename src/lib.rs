@@ -26,6 +26,14 @@ impl Square {
     }
 }
 
+#[derive(Debug, PartialEq)]
+enum SudokuState {
+    Solved,
+    InProgress,
+    Invalid,
+    NeedsGuess,
+}
+
 fn build_puzzle(puzzle_string: &str) -> Vec<Square> {
     let mut grid = Vec::new();
     for (i, character) in puzzle_string.chars().enumerate() {
@@ -55,12 +63,24 @@ fn destruct_puzzle(grid: &Vec<Square>) -> Vec<u32> {
 }
 
 // fn solve_sudoku(grid: &mut Vec<Square>) -> Vec<u32> {
-//     // let mut puzzle_solved = false;
-//     loop {
-//         puzzle_loop(grid);
-//         //  if puzzle_solved { break }
-//     }
-//     return destruct_puzzle(&grid);
+// let mut puzzle_solved = false;
+// loop {
+// puzzle_loop(grid);
+//  if puzzle_solved { break }
+// }
+// return destruct_puzzle(&grid);
+// }
+
+// fn solve_iteration<'b>(grid: &'b mut Vec<&'b mut Square>) -> &'b mut Vec<&'b mut Square> {
+// let mut new_grid: Vec<&mut Square> = Vec::new();
+// for (i, &square) in grid.iter().enumerate() {
+// let column_checked = check_column(square, grid);
+// grid[i].possibles = column_checked.possibles;
+// square.possibles = column_checked.possibles;
+// let row_checked = check_row(square, grid);
+// grid[i].possibles = row_checked.possibles;
+// }
+// return grid;
 // }
 
 fn trim_possibles(possibles: &Vec<u32>, value: u32) -> Vec<u32> {
@@ -101,7 +121,7 @@ fn get_column_by_index(index: usize) -> [usize; 9] {
     }
 }
 
-fn check_row<'a>(square: &'a mut Square, grid: &mut Vec<Square>) -> &'a mut Square {
+fn check_row<'a>(square: &'a mut Square, grid: &mut Vec<&mut Square>) -> &'a mut Square {
     let row = get_row_by_index(square.index);
     for i in row {
         let square_to_check: &Square = &grid[i];
@@ -113,7 +133,7 @@ fn check_row<'a>(square: &'a mut Square, grid: &mut Vec<Square>) -> &'a mut Squa
     return square;
 }
 
-fn check_column<'a>(square: &'a mut Square, grid: &mut Vec<Square>) -> &'a mut Square {
+fn check_column<'a>(square: &'a mut Square, grid: &mut Vec<&mut Square>) -> &'a mut Square {
     let column = get_column_by_index(square.index);
     for &i in column.iter() {
         let square_to_check: &Square = &grid[i];
@@ -125,6 +145,28 @@ fn check_column<'a>(square: &'a mut Square, grid: &mut Vec<Square>) -> &'a mut S
     return square;
 }
 
+fn check_solved_state(grid: Vec<Square>) -> SudokuState {
+    let mut guess_required = true;
+    let mut solved = true;
+    for square in grid {
+        if square.value == None {
+            solved = false;
+            if square.possibles.len() == 0 {
+                return SudokuState::Invalid;
+            } else if square.possibles.len() == 1 {
+                guess_required = false;
+            }
+        }
+    }
+    if solved {
+        return SudokuState::Solved;
+    } else if guess_required {
+        return SudokuState::NeedsGuess;
+    } else {
+        return SudokuState::InProgress;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -133,9 +175,9 @@ mod tests {
     fn test_trim_possibles() {
         let possibles = (1..10).collect::<Vec<u32>>();
         let value = 7;
-        let newPossibles = trim_possibles(&possibles, value);
-        let expectedPossibles = [1, 2, 3, 4, 5, 6, 8, 9];
-        assert_eq!(newPossibles, expectedPossibles)
+        let new_possibles = trim_possibles(&possibles, value);
+        let expected_possibles = [1, 2, 3, 4, 5, 6, 8, 9];
+        assert_eq!(new_possibles, expected_possibles)
     }
 
     #[test]
@@ -176,5 +218,15 @@ mod tests {
         let test_square: &mut Square = &mut grid[2].clone();
         let new_square = check_column(test_square, grid);
         assert_eq!(new_square.possibles, [2, 6, 7, 9])
+    }
+
+    #[test]
+    fn test_check_solved_state() {
+        let test_string =
+            "...28.94.1.4...7......156.....8..57.4.......8.68..9.....196......5...8.3.43.28...";
+        let grid = build_puzzle(test_string);
+        let solved_state = check_solved_state(grid);
+        // Without ever checking for possibles, this should lead to every None value having multiple options
+        assert_eq!(solved_state, SudokuState::NeedsGuess)
     }
 }
