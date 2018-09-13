@@ -1,5 +1,6 @@
 #![feature(exclusive_range_pattern)]
 extern crate wasm_bindgen;
+use std::ops::Range;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -70,7 +71,7 @@ fn trim_possibles(possibles: &Vec<u32>, value: u32) -> Vec<u32> {
         .collect::<Vec<u32>>()
 }
 
-fn get_row_by_index(index: usize) -> std::ops::Range<usize> {
+fn get_row_by_index(index: usize) -> Range<usize> {
     match index {
         0..9 => 0..9,
         9..18 => 9..18,
@@ -82,6 +83,21 @@ fn get_row_by_index(index: usize) -> std::ops::Range<usize> {
         63..72 => 63..72,
         72..81 => 72..81,
         _ => panic!("Could not match index {} to row", index),
+    }
+}
+
+fn get_column_by_index(index: usize) -> [usize; 9] {
+    match index % 9 {
+        0 => [0, 9, 18, 27, 36, 45, 54, 63, 72],
+        1 => [1, 10, 19, 28, 37, 46, 55, 64, 73],
+        2 => [2, 11, 20, 29, 38, 47, 56, 65, 74],
+        3 => [3, 12, 21, 30, 39, 48, 57, 66, 75],
+        4 => [4, 13, 22, 31, 40, 49, 58, 67, 76],
+        5 => [5, 14, 23, 32, 41, 50, 59, 68, 77],
+        6 => [6, 15, 24, 33, 42, 51, 60, 69, 78],
+        7 => [7, 16, 25, 34, 43, 52, 61, 70, 79],
+        8 => [8, 17, 26, 35, 44, 53, 62, 71, 80],
+        _ => panic!("Could not find column for index {}", index),
     }
 }
 
@@ -97,19 +113,17 @@ fn check_row<'a>(square: &'a mut Square, grid: &mut Vec<Square>) -> &'a mut Squa
     return square;
 }
 
-// fn check_column(square: Square, grid: &Vec<Square>, location: usize) {
-//    for check_square in grid.iter().step_by(9) {
-// if let Some(value) = check_square.value {
-// square.possibles = trim_possibles(square.possibles, value);
-// }
-// }
-// }
-
-// fn puzzle_loop(grid: &Vec<Square>) {
-//     for (i, square) in grid.iter().enumerate() {
-//         check_column(&grid, i)
-//     }
-// }
+fn check_column<'a>(square: &'a mut Square, grid: &mut Vec<Square>) -> &'a mut Square {
+    let column = get_column_by_index(square.index);
+    for &i in column.iter() {
+        let square_to_check: &Square = &grid[i];
+        if let Some(value) = square_to_check.value {
+            let new_possibles = trim_possibles(&square.possibles, value);
+            square.possibles = new_possibles
+        }
+    }
+    return square;
+}
 
 #[cfg(test)]
 mod tests {
@@ -152,5 +166,15 @@ mod tests {
         let test_square: &mut Square = &mut grid[2].clone();
         let new_square = check_row(test_square, grid);
         assert_eq!(new_square.possibles, [1, 3, 5, 6, 7])
+    }
+
+    #[test]
+    fn test_check_column() {
+        let test_string =
+            "...28.94.1.4...7......156.....8..57.4.......8.68..9.....196......5...8.3.43.28...";
+        let grid = &mut build_puzzle(test_string);
+        let test_square: &mut Square = &mut grid[2].clone();
+        let new_square = check_column(test_square, grid);
+        assert_eq!(new_square.possibles, [2, 6, 7, 9])
     }
 }
