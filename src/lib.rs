@@ -9,13 +9,14 @@ use wasm_bindgen::prelude::*;
 //     let mut puzzle = build_puzzle(puzzle_string);
 //     solve_sudoku(&mut puzzle)
 // }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Square {
     value: Option<u32>,
     possibles: Vec<u32>,
     index: usize,
     row: Range<usize>,
     column: [usize; 9],
+    box_group: [usize; 9],
 }
 
 impl Square {
@@ -26,11 +27,21 @@ impl Square {
             index,
             row: get_row_by_index(index),
             column: get_column_by_index(index),
+            box_group: get_box_by_index(index),
         }
     }
 
-    fn update_value(&mut self, value: u32) {
-        self.value = Some(value)
+    fn update_value(&mut self) -> bool {
+        let current_val = self.value;
+        if current_val == None && self.possibles.len() == 1 {
+            self.value = Some(self.possibles[0]);
+            self.possibles = vec![];
+            return true;
+        } else if current_val != None {
+            self.possibles = vec![];
+            return false;
+        }
+        return false;
     }
 
     fn trim_possibles(&mut self, value: u32) {
@@ -69,20 +80,22 @@ fn build_possibles(value: Option<u32>) -> Vec<u32> {
     }
 }
 
-fn destruct_puzzle(grid: &Vec<Square>) -> Vec<u32> {
-    let mut solved_puzzle = Vec::new();
+fn destruct_puzzle(grid: &Vec<Square>) -> String {
+    let mut solved_puzzle: String = String::new();
     for square in grid {
         if let Some(value) = square.value {
-            solved_puzzle.push(value);
+            solved_puzzle.push_str(&value.to_string());
+        } else {
+            solved_puzzle.push_str(".");
         }
     }
     return solved_puzzle;
 }
 
-fn solve_sudoku(grid: &mut Vec<Square>) -> Vec<u32> {
+fn solve_sudoku(grid: &mut Vec<Square>) -> String {
     loop {
-        solve_iteration(grid);
-        let solve_status = check_solved_state(&grid);
+        let value_updated = solve_iteration(grid);
+        let solve_status = check_solved_state(value_updated, &grid);
         match solve_status {
             SudokuState::Solved => {
                 println!("SOLVED");
@@ -94,7 +107,7 @@ fn solve_sudoku(grid: &mut Vec<Square>) -> Vec<u32> {
             }
             SudokuState::InProgress => {
                 println!("In progress!");
-                break;
+                continue;
             }
             SudokuState::Invalid => {
                 println!("INVALID");
@@ -102,15 +115,22 @@ fn solve_sudoku(grid: &mut Vec<Square>) -> Vec<u32> {
             }
         }
     }
-    return destruct_puzzle(&grid);
+    return destruct_puzzle(grid);
 }
 
-fn solve_iteration(grid: &mut Vec<Square>) {
+fn solve_iteration(grid: &mut Vec<Square>) -> bool {
     let grid_clone = grid.clone();
+    let mut value_updated = false;
     for (i, _square) in grid_clone.iter().enumerate() {
         check_column(&mut grid[i], &grid_clone);
         check_row(&mut grid[i], &grid_clone);
+        check_box(&mut grid[i], &grid_clone);
+        let update = grid[i].update_value();
+        if (!value_updated && update) {
+            value_updated = true;
+        }
     }
+    return value_updated;
 }
 
 fn get_row_by_index(index: usize) -> Range<usize> {
@@ -143,6 +163,36 @@ fn get_column_by_index(index: usize) -> [usize; 9] {
     }
 }
 
+//  0,  1,  2,   3,  4,  5,   6,  7,  8,
+//  9, 10, 11,  12, 13, 14,  15, 16, 17,
+// 18, 19, 20,  21, 22, 23,  24, 25, 26,
+//
+// 27, 28, 29,  30, 31, 32,  33, 34, 35,
+// 36, 37, 38,  39, 40, 41,  42, 43, 44,
+// 45, 46, 47,  48, 49, 50,  51, 52, 53,
+//
+// 54, 55, 56,  57, 58, 59,  60, 61, 62,
+// 63, 64, 65,  66, 67, 68,  69, 70, 71,
+// 72, 73, 74,  75, 76, 77,  78, 79, 80
+
+fn get_box_by_index(index: usize) -> [usize; 9] {
+    let int = index as u32;
+    let row = int / 9;
+    let column = index % 9;
+    match (row, column) {
+        (0..3, 0..3) => [0, 1, 2, 9, 10, 11, 18, 19, 20],
+        (0..3, 3..6) => [3, 4, 5, 12, 13, 14, 21, 22, 23],
+        (0..3, 6..9) => [6, 7, 8, 15, 16, 17, 24, 25, 26],
+        (3..6, 0..3) => [27, 28, 29, 36, 37, 38, 45, 46, 47],
+        (3..6, 3..6) => [30, 31, 32, 39, 40, 41, 48, 49, 50],
+        (3..6, 6..9) => [33, 34, 35, 42, 43, 44, 51, 52, 53],
+        (6..9, 0..3) => [54, 55, 56, 63, 64, 65, 72, 73, 74],
+        (6..9, 3..6) => [57, 58, 59, 66, 67, 68, 75, 76, 77],
+        (6..9, 6..9) => [60, 61, 62, 69, 70, 71, 78, 79, 80],
+        _ => panic!("could not find box for row {} column {}", row, column),
+    }
+}
+
 fn check_row(square: &mut Square, grid: &Vec<Square>) {
     for i in square.row.clone() {
         let square_to_check: &Square = &grid[i];
@@ -161,13 +211,26 @@ fn check_column(square: &mut Square, grid: &Vec<Square>) {
     }
 }
 
-fn check_solved_state(grid: &Vec<Square>) -> SudokuState {
+fn check_box(square: &mut Square, grid: &Vec<Square>) {
+    for &i in square.box_group.clone().iter() {
+        let square_to_check: &Square = &grid[i];
+        if let Some(value) = square_to_check.value {
+            square.trim_possibles(value)
+        }
+    }
+}
+
+fn check_solved_state(updated: bool, grid: &Vec<Square>) -> SudokuState {
     let mut guess_required = true;
     let mut solved = true;
-    for square in grid {
+    if (updated) {
+        return SudokuState::InProgress;
+    }
+    for (i, square) in grid.iter().enumerate() {
         if square.value == None {
             solved = false;
             if square.possibles.len() == 0 {
+                println!("invalid AT Index {}, {:#?}", i, &grid[i]);
                 return SudokuState::Invalid;
             } else if square.possibles.len() == 1 {
                 guess_required = false;
@@ -236,21 +299,54 @@ mod tests {
     }
 
     #[test]
+    fn test_check_box() {
+        let test_string =
+            "643859721581762493927413856254937168196.48.37378..1.49469865312735126984812394675";
+        let grid = &mut build_puzzle(test_string);
+        let test_square: &mut Square = &mut grid[49].clone();
+        check_box(test_square, grid);
+        assert_eq!(test_square.possibles, [2, 5, 6]);
+    }
+
+    #[test]
     fn test_check_solved_state() {
         let test_string =
             "...28.94.1.4...7......156.....8..57.4.......8.68..9.....196......5...8.3.43.28...";
         let grid = build_puzzle(test_string);
-        let solved_state = check_solved_state(&grid);
+        let solved_state = check_solved_state(false, &grid);
         // Without ever checking for possibles, this should lead to every None value having multiple options
         assert_eq!(solved_state, SudokuState::NeedsGuess)
     }
 
     #[test]
+    fn test_solve_iteration() {
+        let test_string =
+            ".389...5775..84.1...65.748..6..9574.519.43..8.7.6..3.5941.3.5..3.54..1.9...159.34";
+        let after_one =
+            ".389...57752.84.1...65.748..6..9574.519.43..8.7.6..3.5941.3.5..3.54..1.9...159.34";
+        let after_two =
+            ".389...57752384.1.1965.748..63.9574.519.43..8.746..3.5941.3.5..3.54..1.9..7159.34";
+        let grid = &mut build_puzzle(test_string);
+        solve_iteration(grid);
+        let output = destruct_puzzle(&grid);
+        assert_eq!(output, after_one);
+        solve_iteration(grid);
+        let output_2 = destruct_puzzle(&grid);
+        assert_eq!(output_2, after_two);
+    }
+
+    #[test]
     fn test_solve_sudoku() {
         let test_string =
-            "...28.94.1.4...7......156.....8..57.4.......8.68..9.....196......5...8.3.43.28...";
+            ".389...5775..84.1...65.748..6..9574.519.43..8.7.6..3.5941.3.5..3.54..1.9...159.34";
+        // "643859721581762493927413856254937168196.48.37378..1.49469875312735126984812394675";
+        // "6.3..972.5..7....3.2.4..8.6.5.9..1681.......7378..1.4.469..5.1.735..6..48123..6.5";
+        // "...28.94.1.4...7......156.....8..57.4.......8.68..9.....196......5...8.3.43.28...";
+        // "54..6..318.741..2.....3.....542..1.............2..185.....9.....9..452.767..2..95";
+        let solved_string =
+            "438961257752384916196527483863295741519743628274618395941836572385472169627159834";
         let grid = build_puzzle(test_string);
         let solved = solve_sudoku(&mut grid.clone());
-        assert_eq!(solved, [1, 2, 3]);
+        assert_eq!(solved, solved_string)
     }
 }
