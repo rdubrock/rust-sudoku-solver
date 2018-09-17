@@ -38,10 +38,6 @@ impl Square {
             return false;
         } else if self.possibles.len() == 1 {
             self.value = self.possibles.pop();
-            println!(
-                "Updating value at index {} with value {:#?}",
-                self.index, self.value
-            );
             return true;
         } else {
             return false;
@@ -96,13 +92,10 @@ fn solve_sudoku(grid: &mut Vec<Square>) -> String {
         let solve_status = check_solved_state(&current_grid);
         match solve_status {
             SudokuState::Solved => {
-                println!("SOLVED");
                 break;
             }
             SudokuState::NeedsGuess => {
-                println!("Needs guess");
                 let applied_guesses = &mut apply_guess(&current_grid);
-                println!("applied guesses {}", &applied_guesses.len());
                 guesses.append(applied_guesses);
                 if let Some(new_guess) = guesses.pop() {
                     current_grid = new_guess.clone();
@@ -111,16 +104,14 @@ fn solve_sudoku(grid: &mut Vec<Square>) -> String {
                 break;
             }
             SudokuState::InProgress => {
-                println!("In progress!");
                 continue;
             }
             SudokuState::Invalid => {
-                println!("INVALID");
                 if let Some(new_guess) = guesses.pop() {
                     current_grid = new_guess.clone();
                     continue;
                 }
-                break;
+                panic!("Invalid puzzle");
             }
         }
     }
@@ -136,8 +127,6 @@ fn apply_guess(grid: &Vec<Square>) -> Vec<Vec<Square>> {
             min_possibles = possibles.clone();
         }
     }
-
-    println!("MIN POSSIBLES {}", min_possibles);
 
     for square in grid {
         let possibles_size = square.possibles.len();
@@ -170,21 +159,9 @@ fn solve_iteration(grid: &mut Vec<Square>) {
     let mut value_updated = false;
     for (i, _square) in grid_clone.iter().enumerate() {
         let grid_to_pass = grid.clone();
-        if i == 17 {
-            println!("INDEX 17 {:#?}", &grid[i].possibles)
-        }
         check_column(&mut grid[i], &grid_to_pass);
-        if i == 17 {
-            println!("INDEX 17 {:#?}", &grid[i].possibles)
-        }
         check_row(&mut grid[i], &grid_to_pass);
-        if i == 17 {
-            println!("INDEX 17 {:#?}", &grid[i].possibles)
-        }
         check_box(&mut grid[i], &grid_to_pass);
-        if i == 17 {
-            println!("INDEX 17 {:#?}", &grid[i].possibles)
-        }
         let update = grid[i].update_value();
         if update {
             value_updated = true;
@@ -224,18 +201,6 @@ fn get_column_by_index(index: usize) -> [usize; 9] {
         _ => panic!("Could not find column for index {}", index),
     }
 }
-
-//  0,  1,  2,   3,  4,  5,   6,  7,  8,
-//  9, 10, 11,  12, 13, 14,  15, 16, 17,
-// 18, 19, 20,  21, 22, 23,  24, 25, 26,
-//
-// 27, 28, 29,  30, 31, 32,  33, 34, 35,
-// 36, 37, 38,  39, 40, 41,  42, 43, 44,
-// 45, 46, 47,  48, 49, 50,  51, 52, 53,
-//
-// 54, 55, 56,  57, 58, 59,  60, 61, 62,
-// 63, 64, 65,  66, 67, 68,  69, 70, 71,
-// 72, 73, 74,  75, 76, 77,  78, 79, 80
 
 fn get_box_by_index(index: usize) -> [usize; 9] {
     let int = index as u32;
@@ -289,7 +254,6 @@ fn check_solved_state(grid: &Vec<Square>) -> SudokuState {
         if square.value == None {
             solved = false;
             if square.possibles.len() == 0 {
-                println!("invalid AT Index {}, {:#?}", i, &grid[i]);
                 return SudokuState::Invalid;
             } else if square.possibles.len() == 1 {
                 guess_required = false;
