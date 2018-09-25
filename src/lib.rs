@@ -5,10 +5,12 @@ use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub fn solve_string(puzzle_string: &str) -> String {
-    let puzzle = &mut build_puzzle(puzzle_string);
+    let puzzle = build_puzzle(puzzle_string);
     let solved = solve_sudoku(puzzle);
     return solved;
 }
+
+type Grid = Vec<Square>;
 
 #[derive(Clone, Debug)]
 struct Square {
@@ -62,7 +64,7 @@ enum SudokuState {
     NeedsGuess,
 }
 
-fn build_puzzle(puzzle_string: &str) -> Vec<Square> {
+fn build_puzzle(puzzle_string: &str) -> Grid {
     let mut grid = Vec::new();
     for (i, character) in puzzle_string.chars().enumerate() {
         let digit = character.to_digit(10);
@@ -72,7 +74,7 @@ fn build_puzzle(puzzle_string: &str) -> Vec<Square> {
     return grid;
 }
 
-fn destruct_puzzle(grid: &Vec<Square>) -> String {
+fn destruct_puzzle(grid: &Grid) -> String {
     let mut solved_puzzle: String = String::new();
     for square in grid {
         if let Some(value) = square.value {
@@ -84,9 +86,9 @@ fn destruct_puzzle(grid: &Vec<Square>) -> String {
     return solved_puzzle;
 }
 
-fn solve_sudoku(grid: &mut Vec<Square>) -> String {
-    let guesses: &mut Vec<Vec<Square>> = &mut vec![];
-    let mut current_grid = grid.clone();
+fn solve_sudoku(grid: Grid) -> String {
+    let guesses: &mut Vec<Grid> = &mut vec![];
+    let mut current_grid = grid;
     loop {
         solve_iteration(&mut current_grid);
         let solve_status = check_solved_state(&current_grid);
@@ -98,7 +100,7 @@ fn solve_sudoku(grid: &mut Vec<Square>) -> String {
                 let applied_guesses = &mut apply_guess(&current_grid);
                 guesses.append(applied_guesses);
                 if let Some(new_guess) = guesses.pop() {
-                    current_grid = new_guess.clone();
+                    current_grid = new_guess;
                     continue;
                 }
                 break;
@@ -108,7 +110,7 @@ fn solve_sudoku(grid: &mut Vec<Square>) -> String {
             }
             SudokuState::Invalid => {
                 if let Some(new_guess) = guesses.pop() {
-                    current_grid = new_guess.clone();
+                    current_grid = new_guess;
                     continue;
                 }
                 panic!("Invalid puzzle");
@@ -118,7 +120,7 @@ fn solve_sudoku(grid: &mut Vec<Square>) -> String {
     return destruct_puzzle(&current_grid);
 }
 
-fn apply_guess(grid: &Vec<Square>) -> Vec<Vec<Square>> {
+fn apply_guess(grid: &Grid) -> Vec<Grid> {
     let mut min_possibles = 9;
     let mut guesses_applied = vec![];
     for square in grid {
@@ -132,7 +134,7 @@ fn apply_guess(grid: &Vec<Square>) -> Vec<Vec<Square>> {
         let possibles_size = square.possibles.len();
         if possibles_size == min_possibles {
             for possible in &square.possibles {
-                let grid_with_guess = &mut grid.clone();
+                let mut grid_with_guess = grid.clone();
                 let guessed = Square {
                     value: Some(possible.clone()),
                     possibles: vec![],
@@ -142,19 +144,15 @@ fn apply_guess(grid: &Vec<Square>) -> Vec<Vec<Square>> {
                     box_group: get_box_by_index(square.index),
                 };
                 grid_with_guess[square.index] = guessed;
-                guesses_applied.push(grid_with_guess.clone());
+                guesses_applied.push(grid_with_guess);
             }
             break;
         }
     }
-    for guess in &guesses_applied {
-        let destructed = destruct_puzzle(&guess);
-        print_puzzle(destructed);
-    }
     return guesses_applied;
 }
 
-fn solve_iteration(grid: &mut Vec<Square>) {
+fn solve_iteration(grid: &mut Grid) {
     let grid_clone = grid.clone();
     let mut value_updated = false;
     for (i, _square) in grid_clone.iter().enumerate() {
@@ -220,7 +218,7 @@ fn get_box_by_index(index: usize) -> [usize; 9] {
     }
 }
 
-fn check_row(square: &mut Square, grid: &Vec<Square>) {
+fn check_row(square: &mut Square, grid: &Grid) {
     for i in square.row.clone() {
         let square_to_check: &Square = &grid[i];
         if let Some(value) = square_to_check.value {
@@ -229,7 +227,7 @@ fn check_row(square: &mut Square, grid: &Vec<Square>) {
     }
 }
 
-fn check_column(square: &mut Square, grid: &Vec<Square>) {
+fn check_column(square: &mut Square, grid: &Grid) {
     for &i in square.column.clone().iter() {
         let square_to_check: &Square = &grid[i];
         if let Some(value) = square_to_check.value {
@@ -238,7 +236,7 @@ fn check_column(square: &mut Square, grid: &Vec<Square>) {
     }
 }
 
-fn check_box(square: &mut Square, grid: &Vec<Square>) {
+fn check_box(square: &mut Square, grid: &Grid) {
     for &i in square.box_group.clone().iter() {
         let square_to_check: &Square = &grid[i];
         if let Some(value) = square_to_check.value {
@@ -247,10 +245,10 @@ fn check_box(square: &mut Square, grid: &Vec<Square>) {
     }
 }
 
-fn check_solved_state(grid: &Vec<Square>) -> SudokuState {
+fn check_solved_state(grid: &Grid) -> SudokuState {
     let mut guess_required = true;
     let mut solved = true;
-    for (i, square) in grid.iter().enumerate() {
+    for (_i, square) in grid.iter().enumerate() {
         if square.value == None {
             solved = false;
             if square.possibles.len() == 0 {
@@ -261,7 +259,6 @@ fn check_solved_state(grid: &Vec<Square>) -> SudokuState {
         }
     }
     if solved {
-        print_puzzle(destruct_puzzle(grid));
         return SudokuState::Solved;
     } else if guess_required {
         return SudokuState::NeedsGuess;
